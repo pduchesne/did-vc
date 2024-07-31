@@ -49,10 +49,15 @@ def hash_proof_options(proof, context):
 
 def sign(credentials, key, keyid):
 
+    # Remove the proof if any
+    # Should we raise an error if there's a proof already ?
+    credentials_to_sign = credentials.copy()
+    credentials_to_sign.pop('proof', None)
+
     #
     # Hash canonized credentials
     #
-    doc_hash = hash_jsonld(credentials)
+    doc_hash = hash_jsonld(credentials_to_sign)
     #print(len(doc_hash)) # Should be 32
 
 
@@ -69,7 +74,7 @@ def sign(credentials, key, keyid):
         "proofValue": None
     }
     # Hash the proof options
-    proof_hash = hash_proof_options(proof, credentials["@context"])
+    proof_hash = hash_proof_options(proof, credentials_to_sign["@context"])
 
 
     # The hash to sign is the concatenation of the proof hash and the document hash,
@@ -102,7 +107,9 @@ def sign(credentials, key, keyid):
     #
     proof['proofValue'] = proofValue.decode()
 
-    return proof
+    credentials_to_sign['proof'] = proof
+
+    return credentials_to_sign
 
 
 def verify(credentials, key):
