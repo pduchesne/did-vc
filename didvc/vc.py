@@ -6,6 +6,7 @@ from jwcrypto import jwk, jwe, jwt
 import json
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 from datetime import datetime
+import base58
 
 
 # Implemented following https://grotto-networking.com/blog/posts/jsonldProofs.html and
@@ -92,14 +93,14 @@ def sign(credentials, key, keyid):
     proofbytes = private_key.sign(combined_hash)
     #print(f"Length of proof signature: {len(proofbytes)}")
 
-    ## is base64 the correct encoding ?
-    proofValue = encode(data=proofbytes, encoding='base64')
+    ## is base58 the correct encoding ?
+    proofValue = base58.b58encode(proofbytes) # encode(data=proofbytes, encoding='base64')
 
 
     #
     # Add the signature to the proof
     #
-    proof['proofValue'] = proofValue
+    proof['proofValue'] = proofValue.decode()
 
     return proof
 
@@ -143,7 +144,7 @@ def verify(credentials, key):
 
 
     # Extract signature bytes
-    proofbytes = decode(proof['proofValue'])
+    proofbytes = base58.b58decode(proof['proofValue'])
 
     # Verify against the hash
     public_key.verify(proofbytes, combined_hash)

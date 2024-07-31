@@ -2,3 +2,4 @@ pyld
 cryptography
 py-multibase
 jwcrypto
+base58
