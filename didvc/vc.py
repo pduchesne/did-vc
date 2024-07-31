@@ -6,7 +6,9 @@ from jwcrypto import jwk, jwe, jwt
 import json
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 from datetime import datetime
-import base58
+import base58, base64
+
+import didvc
 
 
 # Implemented following https://grotto-networking.com/blog/posts/jsonldProofs.html and
@@ -112,7 +114,23 @@ def sign(credentials, key, keyid):
     return credentials_to_sign
 
 
-def verify(credentials, key):
+async def verify(credentials):
+    proof = credentials['proof']
+    methodId = proof['verificationMethod']
+    did = methodId.split('#')[0]
+    diddoc = await didvc.resolve(did)
+
+    method = next((method for method in diddoc['verificationMethod'] if method['id'] == methodId), None)
+    publicKey58 = method['publicKeyBase58']
+
+    publicKeyBytes = base58.b58decode(publicKey58)
+    publicKey64 = base64.urlsafe_b64encode(publicKeyBytes).decode().strip('=')
+
+    key = {'crv': 'Ed25519', 'kty': 'OKP', 'x': publicKey64}
+
+    return verify_with_key(credentials, key)
+
+def verify_with_key(credentials, key):
 
     #
     # Split the credentials into credentials_without_proof and proof

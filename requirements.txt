@@ -3,3 +3,7 @@ cryptography
 py-multibase
 jwcrypto
 base58
+requests
+didkit
+pytest-asyncio
+pytest
