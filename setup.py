@@ -1,3 +1,5 @@
+import io
+import os
 from setuptools import setup
 
 def read(*paths, **kwargs):
