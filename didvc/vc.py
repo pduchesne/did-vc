@@ -9,6 +9,8 @@ from datetime import datetime
 import base58, base64
 
 import didvc
+from didvc.signatures import Ed25519Signature2020
+from didvc.signatures import Ed25519Signature2018
 
 
 # Implemented following https://grotto-networking.com/blog/posts/jsonldProofs.html and
@@ -49,7 +51,7 @@ def hash_proof_options(proof, context):
     return proof_hash
 
 
-def sign(credentials, key, keyid):
+def sign(credentials, key, keyid, proofType = "Ed25519Signature2020"):
 
     # Remove the proof if any
     # Should we raise an error if there's a proof already ?
@@ -69,24 +71,13 @@ def sign(credentials, key, keyid):
 
     # Define the proof template
     proof = {
-        "type": "Ed25519Signature2020",
+        "type": proofType,
         "created": datetime.now().isoformat(sep='T',timespec='auto'),
         "verificationMethod": keyid,
         "proofPurpose": "assertionMethod",
-        "proofValue": None
     }
     # Hash the proof options
     proof_hash = hash_proof_options(proof, credentials_to_sign["@context"])
-
-
-    # The hash to sign is the concatenation of the proof hash and the document hash,
-    # as per https://www.w3.org/TR/vc-di-eddsa/#hashing-ed25519signature2020
-    combined_hash = proof_hash + doc_hash
-
-
-    #
-    # Sign the hash
-    #
 
     # convert the JWK into a PEM representation, required by cryptography.hazmat
     keypair = jwk.JWK.from_json(json.dumps(key))
@@ -96,18 +87,16 @@ def sign(credentials, key, keyid):
     private_key = load_pem_private_key(pkcs8Pem, password=None)
     #private_key = ed25519.Ed25519PrivateKey.from_private_bytes(privateBytes)
 
-    # Sign the hash
-    proofbytes = private_key.sign(combined_hash)
-    #print(f"Length of proof signature: {len(proofbytes)}")
 
-    ## is base58 the correct encoding ?
-    proofValue = base58.b58encode(proofbytes) # encode(data=proofbytes, encoding='base64')
+    if proofType == "Ed25519Signature2020":
+        proofValue = Ed25519Signature2020.create_proof_signature(doc_hash, proof_hash, lambda bytes: private_key.sign(bytes))
 
+        proof['proofValue'] = proofValue
+    elif proofType == "Ed25519Signature2018":
+        proof['jws'] = Ed25519Signature2018.create_proof_signature(doc_hash, proof_hash, lambda bytes: private_key.sign(bytes))
+    else:
+        raise Exception("Proof type not supported: "+proofType)
 
-    #
-    # Add the signature to the proof
-    #
-    proof['proofValue'] = proofValue.decode()
 
     credentials_to_sign['proof'] = proof
 
@@ -121,14 +110,17 @@ async def verify(credentials):
     diddoc = await didvc.resolve(did)
 
     method = next((method for method in diddoc['verificationMethod'] if method['id'] == methodId), None)
-    publicKey58 = method['publicKeyBase58']
+    if 'publicKeyJwk' in method:
+        publicKeyJwk = method['publicKeyJwk']
+    elif 'publicKeyBase58' in method:
+        publicKey58 = method['publicKeyBase58']
+        publicKeyBytes = base58.b58decode(publicKey58)
+        publicKey64 = base64.urlsafe_b64encode(publicKeyBytes).decode().strip('=')
+        publicKeyJwk = {'crv': 'Ed25519', 'kty': 'OKP', 'x': publicKey64}
+    else:
+        raise Exception("Require publicKeyJwk or publicKeyBase58")
 
-    publicKeyBytes = base58.b58decode(publicKey58)
-    publicKey64 = base64.urlsafe_b64encode(publicKeyBytes).decode().strip('=')
-
-    key = {'crv': 'Ed25519', 'kty': 'OKP', 'x': publicKey64}
-
-    return verify_with_key(credentials, key)
+    return verify_with_key(credentials, publicKeyJwk)
 
 def verify_with_key(credentials, key):
 
@@ -150,16 +142,6 @@ def verify_with_key(credentials, key):
     # Hash the proof options
     proof_hash = hash_proof_options(proof, credentials["@context"])
 
-
-    # The hash to sign is the concatenation of the proof hash and the document hash,
-    # as per https://www.w3.org/TR/vc-di-eddsa/#hashing-ed25519signature2020
-    combined_hash = proof_hash + doc_hash
-
-
-    #
-    # Verify the hash
-    #
-
     # convert the JWK into a PEM representation, required by cryptography.hazmat
     keypair = jwk.JWK.from_json(json.dumps(key))
     pkcs8Pem = keypair.export_to_pem(private_key=False, password=None)
@@ -168,8 +150,10 @@ def verify_with_key(credentials, key):
     public_key = load_pem_public_key(pkcs8Pem)
 
 
-    # Extract signature bytes
-    proofbytes = base58.b58decode(proof['proofValue'])
-
-    # Verify against the hash
-    public_key.verify(proofbytes, combined_hash)
+    proof_type = proof['type']
+    if proof_type == "Ed25519Signature2020":
+        Ed25519Signature2020.verify_proof(doc_hash, proof_hash, proof, lambda signature, data: public_key.verify(signature, data))
+    elif proof_type == "Ed25519Signature2018":
+        Ed25519Signature2018.verify_proof(doc_hash, proof_hash, proof, lambda signature, data: public_key.verify(signature, data))
+    else:
+        raise Exception("Proof type not supported: " + proof_type)

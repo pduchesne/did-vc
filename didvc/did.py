@@ -13,7 +13,7 @@ async def resolve(did):
 
     # Fall back to didkit
     try:
-        return didkit.resolve_did(did, "{}")
+        return json.loads(await didkit.resolve_did(did, "{}"))
     except Exception as err:
         print ("DIDkit failed, falling back to uniresolver: "+str(err))
         pass
@@ -25,9 +25,10 @@ def resolveuniresolver(did):
     response = requests.get( DID_UNIRESOLVER + did,
                              verify=True,
                              headers={ 'Accept': 'application/json' })
-
-    data = json.loads(response.text)
-    return data
+    if response.ok :
+        return json.loads(response.text)
+    else:
+        raise Exception(f"Uniresolver failed : [{response.status_code}] {response.text}")
 
 def resolveIndy(did):
     response = requests.get( DID_INDYRESOLVER + did,
