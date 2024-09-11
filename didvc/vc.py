@@ -72,9 +72,9 @@ def sign(credentials, key, keyid, proofType = "Ed25519Signature2020"):
     # Define the proof template
     proof = {
         "type": proofType,
-        "created": datetime.now().isoformat(sep='T',timespec='auto'),
-        "verificationMethod": keyid,
         "proofPurpose": "assertionMethod",
+        "verificationMethod": keyid,
+        "created": datetime.now().isoformat(sep='T',timespec='auto')
     }
     # Hash the proof options
     proof_hash = hash_proof_options(proof, credentials_to_sign["@context"])
