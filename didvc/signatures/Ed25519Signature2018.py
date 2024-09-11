@@ -4,7 +4,7 @@ import base64
 
 def create_proof_signature(doc_hash, proof_hash, sign_fun):
 
-    jws_header = b'{"alg": "EdDSA","crit": ["b64"],"b64": false}'
+    jws_header = b'{"alg":"EdDSA","crit":["b64"],"b64":false}'
     b64_header = base64.urlsafe_b64encode(jws_header)
 
     combined_hash =  b64_header + b'.' + proof_hash + doc_hash
