@@ -14,7 +14,7 @@ def create_proof_signature(doc_hash, proof_hash, sign_fun):
 
     jws = b64_header + b'..' + base64.urlsafe_b64encode(proofbytes)
 
-    return jws.decode()[:-2]
+    return jws.decode()
 
 
 def verify_proof(doc_hash, proof_hash, proof, verify_fun):
