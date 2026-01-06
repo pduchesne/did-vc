@@ -28,7 +28,7 @@ def read_requirements(path):
 
 
 setup(name='did-vc',
-      version='0.1',
+      version='1.1.0',
       description='Test lib to sign VCs with DIDs',
       author='pduchesne',
       license='MIT',
